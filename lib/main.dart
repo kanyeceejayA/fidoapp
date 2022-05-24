@@ -1,115 +1,327 @@
+
+// ignore_for_file: public_member_api_docs
+
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_fido2/flutter_fido2.dart';
+
+import 'auth_server.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+// import 'package:local_auth/local_auth.dart';
 
 void main() {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({Key? key}) : super(key: key);
 
-  // This widget is the root of your application.
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
-        primarySwatch: Colors.blue,
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+
+  final Fido2Flutter fido2 = Fido2Flutter(); //instatiate the class
+  final authServer = AuthServer();  //Used to illustrate Communications to your Server
+
+  String rpDomain = 'fido.silbaka.com'; //This should be set by you. it can be local or come from your server.
+  final String rpname = 'Silbaka';
+  List<BiometricType>? _availableBiometrics;
+  String _authorized = 'Not Authorized';
+  String _regResult = '';
+  bool _isAuthenticating = false;
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _urlController = TextEditingController();
+  final _storage = FlutterSecureStorage();
+  final _messengerKey = GlobalKey<ScaffoldMessengerState>(); 
+
+
+  @override
+  void initState() {
+    super.initState();
+    _setUrl();
   }
-}
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key? key, required this.title}) : super(key: key);
+  _updateUrl() async {
+    _storage.write(key: 'baseUrl', value: _urlController.text);
+    _messengerKey.currentState!.showSnackBar(SnackBar(content: Text('successfully changed url to ${_urlController.text}')));
+    rpDomain = _urlController.text;
+  }
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
+  Future<void> _setUrl() async {
+    _urlController.text = await _storage.read(key: 'baseUrl')?? 'https://fido.silbaka.com';
+  }
 
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
 
-  final String title;
+  Future<void> _getAvailableBiometrics() async {
+    late List<BiometricType> availableBiometrics;
+    
+    availableBiometrics = await fido2.getAvailableBiometrics();
+    
+    if (!mounted) {
+      return;
+    }
 
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      _availableBiometrics = availableBiometrics;
     });
   }
 
+  Future<dynamic> _register() async {
+    RegistrationResult result;
+    String finalMessage = '';
+    String message = '';
+      setState(() {
+        _isAuthenticating = true;
+        _authorized = 'Authenticating';
+      });
+    try {
+        //Contact Your Server and receive the challenge and a list of credentials to exclude.
+        Map request = await authServer.registrationRequest(userId: _usernameController.text);
+
+       //Send information from server to plugin to authenticate.
+       result = await fido2.register(
+        challenge: request['challenge'],
+        excludeCredentials: request['credentials'],
+        userId: _usernameController.text,
+        rpDomain: rpDomain,
+        options: const AuthenticationOptions(
+          useErrorDialogs: true,
+          stickyAuth: true,
+          biometricOnly: true,
+        ),
+      );
+
+      //Store Credential
+      finalMessage = await authServer.storeCredential(userId:_usernameController.text , credentialId:result.credentialId ,signedChallenge:result.signedChallenge , publicKey:result.publicKey );
+      
+      if (finalMessage.contains('Successful') ) message = "\n $finalMessage \n\n \ncredid: \t ${result.credentialId} \n\n pubkey: \t ${result.publicKey} \n\n signedChallenge: \t ${result.signedChallenge}";
+      setState(() {
+        _isAuthenticating = false;
+        _authorized = 'Authenticated';
+      });
+    } on PlatformException catch (e) {
+      print(e);
+      setState(() {
+        _isAuthenticating = false;
+        _authorized = 'Error - ${e.message}';
+        message = '';
+        _regResult = e.toString();
+      });
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+
+    
+    setState(() {
+      _authorized = "authorized";
+      _regResult = message;
+    });
+  }
+
+  Future<dynamic> _signChallenge() async {
+    SigningResult result;
+    String finalMessage = '';
+    String message = '';
+      setState(() {
+        _isAuthenticating = true;
+        _authorized = 'Authenticating';
+      });
+    // bool authenticated = false;
+    try {
+
+      //Contact Your Server and receive the challenge and a list of credentials to exclude.
+      Map request = await authServer.signingRequest(userId: _usernameController.text);
+      print('AKBR credentials:'+request['credentials'].toString());
+      if(request['credentials'].toString() == '[]'){
+          message = 'Error - User Not found.';
+         }else{
+
+            result = await fido2.signChallenge(
+              challenge: request['challenge'],
+              allowCredentials: request['credentials'] as List<String>,
+              userId: _usernameController.text,
+              rpDomain: rpDomain,
+              options: const AuthenticationOptions(
+                useErrorDialogs: true,
+                stickyAuth: true,
+                biometricOnly: true,
+              ),
+
+            );
+            finalMessage = await authServer.confirmSignIn(userId: _usernameController.text, credentialId: result.credentialId, signedChallenge: result.signedChallenge);
+            message = "\n $finalMessage\n credentialID: \t ${result.credentialId} \n\n userId: \t ${result.userId} \n\n No. of Saved Credentials for User: \t ${(request['credentials'] as List<String>).length} \n\n signedChallenge: \t ${result.signedChallenge}";
+          
+         }
+      
+      setState(() {
+        _isAuthenticating = false;
+        _authorized = 'Authenticated';
+      });
+    } on PlatformException catch (e) {
+      print(e);
+      setState(() {
+        _isAuthenticating = false;
+        _authorized = 'Error - ${e.message}';
+        _regResult = e.toString();
+      });
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+
+    
+    setState(() {
+      _authorized = "authorized";
+      _regResult = message;
+    });
+  }
+
+ 
+  Future<void> _cancelAuthentication() async {
+    await fido2.stopAuthentication();
+    setState(() => _isAuthenticating = false);
+  }
+
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          mainAxisAlignment: MainAxisAlignment.center,
+    return MaterialApp(
+      scaffoldMessengerKey: _messengerKey,
+      home: Scaffold(
+        appBar: AppBar(
+          title: const Text('Fido2 Auth Example Flutter'),
+        ),
+        body: ListView(
+          padding: const EdgeInsets.only(top: 30),
           children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Text(': $_availableBiometrics\n'),
+                ElevatedButton(
+                  onPressed: _getAvailableBiometrics,
+                  child: const Text('Check for Auth Support'),
+                ),
+                const Divider(height: 20),
+                Text('Current State: $_authorized\n'),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal:16.0),
+
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Username:'),
+                      TextField(
+                        controller: _usernameController,
+                          maxLines: 1,
+                          textInputAction: TextInputAction.done,
+                          // style: TextStyle(fontSize: 16,),
+                          textAlignVertical: TextAlignVertical.center,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder() ,
+                            hintStyle:  TextStyle(color: Colors.black54,fontSize: 15),
+                          )
+                        ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 20),
+                if (_isAuthenticating)
+                  ElevatedButton(
+                    onPressed: _cancelAuthentication,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const <Widget>[
+                        Text('Cancel Authentication'),
+                        Icon(Icons.cancel),
+                      ],
+                    ),
+                  )
+                else
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: <Widget>[
+                      ElevatedButton(
+                        onPressed: _register,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            Text(_isAuthenticating
+                                ? 'Cancel'
+                                : 'Register'),
+                            const Icon(Icons.fingerprint),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton(
+                        onPressed: _signChallenge,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const <Widget>[
+                            Text('Sign'),
+                            Icon(Icons.login),
+                          ],
+                        ),
+                      ),
+                      
+                    ],
+                  ),
+              const SizedBox(height: 10,),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text('$_regResult \n'),
+              ),
+              const Divider(height: 50,),Padding(
+                  padding: const EdgeInsets.symmetric(horizontal:16.0),
+
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Remote Server Address:'),
+                      TextField(
+                        controller: _urlController,
+                          maxLines: 1,
+                          textInputAction: TextInputAction.done,
+                          autocorrect: false,
+                          // style: TextStyle(fontSize: 16,),
+                          textAlignVertical: TextAlignVertical.center,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder() ,
+                            hintStyle:  TextStyle(color: Colors.black54,fontSize: 15),
+                          )
+                        ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 20),
+                ElevatedButton(
+                        onPressed: _updateUrl,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Text('updateUrl'),
+                            Icon(Icons.link),
+                          ],
+                        ),
+                      ),
+                      
+
+              ],
             ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
+}
+
+enum _SupportState {
+  unknown,
+  supported,
+  unsupported,
 }

@@ -37,6 +37,7 @@ dependencies:
   flutter_fido2:
     git:
       url: https://github.com/kanyeceejayA/flutter_fido2.git
+      ref: main
   http: ^0.13.4
 
 dev_dependencies:

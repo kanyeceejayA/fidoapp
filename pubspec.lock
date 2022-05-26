@@ -87,8 +87,8 @@ packages:
     dependency: "direct main"
     description:
       path: "."
-      ref: HEAD
-      resolved-ref: fc012c5725e5e9fe55909d0034e75f7e42555b22
+      ref: main
+      resolved-ref: "04bc9010e8add4df79c4b00b3953bc02ddb8ef6d"
       url: "https://github.com/kanyeceejayA/flutter_fido2.git"
     source: git
     version: "0.0.1"

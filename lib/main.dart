@@ -1,12 +1,11 @@
 
-// ignore_for_file: public_member_api_docs
+ //gnore_for_file: public_member_api_docs
 
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_fido2/flutter_fido2.dart';
 
-import 'auth_server.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 void main() {
@@ -22,7 +21,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
 
-  final Fido2Flutter fido2 = Fido2Flutter(); //instatiate the class
+  final FlutterFido2 fido2 = FlutterFido2(); //instatiate the class
   final authServer = AuthServer();  //Used to illustrate Communications to your Server
 
   String rpDomain = 'fido.silbaka.com'; //This should be set by you. it can be local or come from your server.
@@ -231,15 +230,21 @@ class _MyAppState extends State<MyApp> {
                 ),
                 const Divider(height: 20),
                 if (_isAuthenticating)
-                  ElevatedButton(
-                    onPressed: _cancelAuthentication,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const <Widget>[
-                        Text('Cancel Authentication'),
-                        Icon(Icons.cancel),
-                      ],
-                    ),
+                  Column(
+                    children: [
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 5,),
+                      ElevatedButton(
+                        onPressed: _cancelAuthentication,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const <Widget>[
+                            Text('Cancel'),
+                            Icon(Icons.cancel),
+                          ],
+                        ),
+                      ),
+                    ],
                   )
                 else
                   Row(

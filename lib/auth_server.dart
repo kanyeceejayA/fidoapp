@@ -4,7 +4,6 @@ import 'dart:math';
 import 'api_service.dart';
 import 'package:crypton/crypton.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class AuthServer{
   	// final LocalAuthentication auth = LocalAuthentication();

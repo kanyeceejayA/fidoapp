@@ -8,7 +8,6 @@ import 'package:flutter_fido2/flutter_fido2.dart';
 
 import 'auth_server.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-// import 'package:local_auth/local_auth.dart';
 
 void main() {
   runApp(const MyApp());

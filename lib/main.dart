@@ -200,13 +200,13 @@ class _MyAppState extends State<MyApp> {
             Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
-                Text(': $_availableBiometrics\n'),
+                Text('$_availableBiometrics\n'),
                 ElevatedButton(
                   onPressed: _listAvaliableAuth,
-                  child: const Text('Check for Auth Support'),
+                  child: const Text('Check for Authenticators '),
                 ),
                 const Divider(height: 20),
-                Text('Current State: $_authorized\n'),
+                Text((_authorized == 'null')? '': 'Current State: $_authorized\n'),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal:16.0),
 

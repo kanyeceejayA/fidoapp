@@ -88,7 +88,7 @@ packages:
     description:
       path: "."
       ref: main
-      resolved-ref: "04bc9010e8add4df79c4b00b3953bc02ddb8ef6d"
+      resolved-ref: "804d43f69d46a26b664e78994ffbba67aaff016b"
       url: "https://github.com/kanyeceejayA/flutter_fido2.git"
     source: git
     version: "0.0.1"

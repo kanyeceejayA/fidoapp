@@ -20,12 +20,12 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  String rpDomain = 'https://fido.silbaka.com'; //This should be set by you. it can be local or come from your server.
+  final String rpname = 'Demo App';
 
   final FlutterFido2 fido2 = FlutterFido2(); //instatiate the class
-  final authServer = AuthServer();  //Used to illustrate Communications to your Server
+  final authServer = AuthServer(baseUrl: 'https://fido.silbaka.com');  //Used to illustrate Communications to your Server
 
-  String rpDomain = 'fido.silbaka.com'; //This should be set by you. it can be local or come from your server.
-  final String rpname = 'Silbaka';
   List<BiometricType>? _availableBiometrics;
   String _authorized = 'Not Authorized';
   String _regResult = '';
@@ -49,11 +49,11 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _setUrl() async {
-    _urlController.text = await _storage.read(key: 'baseUrl')?? 'https://fido.silbaka.com';
+    _urlController.text = await _storage.read(key: 'baseUrl')?? rpDomain;
   }
 
 
-  Future<void> _getAvailableBiometrics() async {
+  Future<void> _listAvaliableAuth() async {
     late List<BiometricType> availableBiometrics;
     
     availableBiometrics = await fido2.getAvailableBiometrics();
@@ -202,7 +202,7 @@ class _MyAppState extends State<MyApp> {
               children: <Widget>[
                 Text(': $_availableBiometrics\n'),
                 ElevatedButton(
-                  onPressed: _getAvailableBiometrics,
+                  onPressed: _listAvaliableAuth,
                   child: const Text('Check for Auth Support'),
                 ),
                 const Divider(height: 20),
